@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Email App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+    <link rel="stylesheet" href="css/app.min.css">
+    <style>
+      .topbar-color {
+        background-color: #39D;
+      }
+      #buttonCenter {
+        text-align: center;
+      }
+      
+    </style>
+  </head>
+
+  <body>
+    <div class="app-page topbar-color" data-page="home">
+      <div class="app-topbar">
+        <div class="app-title">Send An Email</div>
+      </div>
+      <div class="app-content">      
+        <p class="app-section">
+          Click below to send an email
+        </p>
+
+        <div id="emailList">
+        </div>
+        
+        <div class="app-section">
+          <div class="app-button" onclick="newToEmail()" data-target="writeEmail">Send to new address</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-page topbar-color" data-page="writeEmail">
+      <div class="app-topbar">
+        <div class="app-title">Write Email</div>
+        <div class="right app-button" data-back>Done</div>
+      </div>
+
+      <div class="app-content">
+        <div id="infoArea">      
+        </div>
+        <div class="app-section">
+          From:
+          <input class="app-input" id="fromEmail" type="email" name="fromEmail" placeholder="Your Email Address">
+        </div>
+        <div class="app-section">
+          To:
+          <input class="app-input" id="toEmail" type="email" name="toEmail" placeholder="Recipient Email Address">
+        </div>
+
+        <form class="app-section">
+          <input class="app-input" id="subject" name="subject" placeholder="Subject">
+          <textarea class="app-input" id="message" name="message" placeholder="Message"></textarea>
+        </form>
+
+        <form class="app-section">
+          <div class="app-button green app-submit">Send</div>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/zepto.js"></script>
+    <script src="js/app.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script type="text/javascript">
+      App.controller('home', function (page) {
+      	var $topbar = $(page).find('.app-topbar');
+      	$topbar.addClass("topbar-color");
+        $(page).on('appShow', loadEmailList);
+      });
+      
+      App.controller('writeEmail', function (page) {
+        var $topbar = $(page).find('.app-topbar');
+        var $fromEmail = $(page).find('#fromEmail');
+        var $toEmail = $(page).find('#toEmail');
+        $topbar.addClass("topbar-color");
+        if (typeof(localStorage) !== 'undefined') {
+        	$fromEmail.val(localStorage.getItem("fromEmail"));
+        	$toEmail.val(localStorage.getItem("toEmail"));
+    	  }
+        $(page).find(".app-submit").on('click', validateForm);
+      });
+
+      function newToEmail() {
+      	// clear the toEmail for NEW email address
+      	if (typeof(localStorage) !== 'undefined') {
+      		localStorage.setItem("toEmail", '');
+      	}
+      }
+
+      function setToEmail(e) {
+      	if (typeof(localStorage) !== 'undefined') {
+	      	localStorage.setItem("toEmail", e.innerHTML);
+    		} else {
+    			alert("To Email cannot be stored on this device");
+    		}
+      }
+
+      function loadEmailList() {
+      	if (typeof(localStorage) !== 'undefined') {
+	        var toEmailAddresses = JSON.parse(localStorage.getItem("toEmailAddresses"));
+	        var aButton = buttonList = "";
+	        
+	        if (toEmailAddresses !== null) {
+	          for (var i = 0; i < toEmailAddresses.length; i++) {
+	            aButton = '<div class="app-button" class="emailItem" onclick="setToEmail(this)" data-target="writeEmail">' + toEmailAddresses[i] + '</div>';
+	            buttonList += aButton;
+	            //alert(toEmailAddresses[i]);
+	          }
+	          $("#emailList").addClass("app-section");
+	        	$("#emailList").html(buttonList);
+	        } else {
+	        	$("#emailList").removeClass("app-section");
+	        }
+	        
+      	} else {
+      		$("#emailList").removeClass("app-section");
+      	}
+      }
+
+      function validateEmail(email) {
+        var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        return re.test(email);
+      }
+
+      function validateForm() {
+        var errorMessage = "";
+        var fieldsMissing = "";
+        var invalidEmails = "";
+        var successMsg = "";
+
+        if ($("#fromEmail").val() == "") {
+          fieldsMissing += "<br>From Email";
+        } else if (!validateEmail($("#fromEmail").val())) {
+          invalidEmails += "<br>From Email"
+        }
+
+        if ($("#toEmail").val() == "") {
+          fieldsMissing += "<br>To Email";
+        } else if (!validateEmail($("#toEmail").val())) {
+          invalidEmails += "<br>To Email"
+        }
+
+        if ($("#subject").val() == "") {
+          fieldsMissing += "<br>Subject";
+        }
+
+        if (fieldsMissing != "") {
+          errorMessage += "<strong>Please enter values for the following field(s):</strong>" + fieldsMissing;
+        }
+        if (invalidEmails != "") {
+          if (errorMessage != "")
+            errorMessage += "<br>";
+          errorMessage += "<strong>Invalid email address for:</strong>" + invalidEmails;
+        }
+
+        if (errorMessage != "") {
+          $("#infoArea").addClass("app-section");         
+          $("#infoArea").html(errorMessage);
+          //e.preventDefault();
+          return false;
+        } else {
+          $("#infoArea").removeClass("app-section");         
+          $("#infoArea").html("");
+
+          $.ajax({
+          	type: "post",
+          	data: {'fromEmail': $("#fromEmail").val(), 'toEmail': $("#toEmail").val(), 'subject' : $("#subject").val(), 'message' : $("#message").val()} ,
+            url: "php/sendmail.php",
+            dataType: 'jsonp',
+            success: function (data) {
+              //var result = $.parseJSON(data);
+              var newToEmailAddresses;
+              var infoMsg = "";
+              var result = data['success'];
+              if (result) {
+              	if (typeof(localStorage) !== 'undefined') {
+		              localStorage.setItem("fromEmail", $("#fromEmail").val());
+		              var toEmailAddresses = JSON.parse(localStorage.getItem("toEmailAddresses"));
+		              if (toEmailAddresses) {
+		                var pos = toEmailAddresses.length;
+                    // Check the existing To Email list to see if exists
+		                for (var i = toEmailAddresses.length - 1; i >= 0; i--) {
+		                	var currEmail = new String(toEmailAddresses[i]);
+		                	var toEmail = new String($("#toEmail").val());
+		                	//alert("ToEmail: " + toEmail + " StoredEmail: " + currEmail);
+		                	if (!currEmail.localeCompare(toEmail))
+		                		break;
+		                }
+                    // If not in existing list, then add to list at the end
+		                if (i < 0) {
+		                	toEmailAddresses[pos] = $("#toEmail").val();
+		                	toEmailAddresses.sort();
+		                	localStorage.setItem("toEmailAddresses", JSON.stringify(toEmailAddresses));
+		              	}
+		              } else {
+                    // Create a new array of To Email addresses
+		                newToEmailAddresses = new Array($("#toEmail").val());
+		                localStorage.setItem("toEmailAddresses", JSON.stringify(newToEmailAddresses));
+		              }
+	            	} else {
+	            		alert("To Email Addresses cannot be stored on this device");
+	            	}
+	              infoMsg = "<strong>Email successfully sent to: " + $("#toEmail").val() +"</strong>";  
+          		} else {
+          			infoMsg = "<strong>Email failed: " + data['errmsg'] + "</strong>";
+          		}
+          		$("#infoArea").addClass("app-section");         
+	            $("#infoArea").html(infoMsg);
+            },
+            error: function(xhr){    
+   			    	$("#infoArea").html("Your email could not be sent - please try again later.").show();
+  					}
+          });
+          return true;
+        }
+      }
+
+      try {
+        App.restore();
+      } catch (err) {
+        App.load('home');
+      }
+    </script>
+  </body>
+</html>
